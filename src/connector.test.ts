@@ -15,7 +15,7 @@ const notification = (overrides: Partial<B1WebhookNotification> = {}): B1Webhook
   EventId: 'evt-42-1', EventTime: '2026-08-17T13:00:00.000Z', ...overrides,
 });
 
-function fixture(options: { mode?: 'observe' | 'issue'; receiptCode?: unknown } = {}) {
+function fixture(options: { mode?: 'observe' | 'issue'; receiptCode?: unknown; validityDays?: number } = {}) {
   const documents = new Map<string, B1Document>([
     ['DeliveryNotes:42', structuredClone(delivery)],
     ['PurchaseDeliveryNotes:77', { ...structuredClone(delivery), DocEntry: 77, U_GOVP_Code: options.receiptCode }],
@@ -37,6 +37,7 @@ function fixture(options: { mode?: 'observe' | 'issue'; receiptCode?: unknown } 
   const connector = new SapBusinessOneGovpConnector({
     mode: options.mode ?? 'issue', systemId: 'B1-DEMO', issuerName: 'Empresa B1',
     deliveryCodeField: 'U_GOVP_Code', deliveryUrlField: 'U_GOVP_URL', receiptGovpField: 'U_GOVP_Code',
+    validityDays: options.validityDays,
   }, sap, exchange, store);
   return { connector, store, patches, issueCalls };
 }
@@ -63,7 +64,17 @@ describe('GOVP for SAP Business One', () => {
     expect(issueCalls).toHaveLength(1);
     expect(issueCalls[0]!.key).toMatch(/^sap-b1:[a-f0-9]{16}:delivery:42$/);
     expect(issueCalls[0]!.input.source).toEqual({ platform: 'sap_business_one', externalId: 'delivery-42' });
+    expect(issueCalls[0]!.input.validUntil).toBe('2027-08-17T00:00:00.000Z');
     expect(patches).toEqual([{ U_GOVP_Code: 'GOVP-42', U_GOVP_URL: 'https://partners.gemacode.org/exchange/comprobar/GOVP-42' }]);
+  });
+
+  it('calcula la vigencia desde DocDate de forma estable entre ejecuciones', async () => {
+    const first = fixture({ validityDays: 30 });
+    const second = fixture({ validityDays: 30 });
+    await first.connector.handle(notification());
+    await second.connector.handle(notification({ EventId: 'evt-retry', EventTime: '2026-08-18T18:00:00.000Z' }));
+    expect(first.issueCalls[0]!.input.validUntil).toBe('2026-09-16T00:00:00.000Z');
+    expect(second.issueCalls[0]!.input.validUntil).toBe(first.issueCalls[0]!.input.validUntil);
   });
 
   it('no duplica una emisión ni acepta un evento más antiguo', async () => {
@@ -88,6 +99,7 @@ describe('GOVP for SAP Business One', () => {
     const exchange = {} as GovpExchangeClient;
     const sap = {} as B1ServiceLayerClient;
     expect(() => new SapBusinessOneGovpConnector({ mode: 'issue', systemId: 'x', issuerName: 'x', receiptGovpField: 'U_bad-value' }, sap, exchange, new MemoryB1GovpStore())).toThrow('UDF');
+    expect(() => new SapBusinessOneGovpConnector({ mode: 'issue', systemId: 'x', issuerName: 'x', validityDays: 0 }, sap, exchange, new MemoryB1GovpStore())).toThrow('validityDays');
     expect(() => new B1ServiceLayerClient({ baseUrl: 'http://sap.example/b1s/v2', credentials: { companyDb: 'x', userName: 'x', password: 'x' } })).toThrow('HTTPS');
     expect(() => new B1ServiceLayerClient({ baseUrl: 'https://sap.example/b1s/v1', credentials: { companyDb: 'x', userName: 'x', password: 'x' } })).toThrow('OData v4');
   });

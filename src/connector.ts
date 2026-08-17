@@ -39,6 +39,15 @@ function time(value: string) {
   return parsed;
 }
 
+function validityFromDocument(document: B1Document, validityDays: number) {
+  if (!document.DocDate) throw new TypeError('DocDate es obligatorio para emitir un GOVP determinista.');
+  const issuedAt = /^\d{4}-\d{2}-\d{2}$/.test(document.DocDate)
+    ? Date.parse(`${document.DocDate}T00:00:00.000Z`)
+    : Date.parse(document.DocDate);
+  if (!Number.isFinite(issuedAt)) throw new TypeError('DocDate debe ser una fecha ISO válida.');
+  return new Date(issuedAt + validityDays * 86_400_000).toISOString();
+}
+
 export class SapBusinessOneGovpConnector {
   private readonly config: B1ConnectorConfig;
 
@@ -57,6 +66,9 @@ export class SapBusinessOneGovpConnector {
       deliveryUrlField: field(config.deliveryUrlField),
     };
     if (!this.config.systemId || !this.config.issuerName) throw new TypeError('systemId e issuerName son obligatorios.');
+    if (!Number.isInteger(this.config.validityDays ?? 365) || (this.config.validityDays ?? 365) < 1) {
+      throw new TypeError('validityDays debe ser un entero positivo.');
+    }
   }
 
   async handle(notification: B1WebhookNotification) {
@@ -88,7 +100,7 @@ export class SapBusinessOneGovpConnector {
       subject: { type: 'shipment', id: String(document.DocEntry), name: `SAP Business One Delivery ${document.DocNum ?? document.DocEntry}`, description: `${document.DocumentLines?.length ?? 0} posiciones expedidas` },
       requirement: 'Demuestra una entrega de SAP Business One mediante la huella de sus datos logísticos mínimos.',
       evidence: [{ label: 'Huella canónica de SAP Business One Delivery', sha256: b1DocumentSha256(document) }],
-      validUntil: new Date(Date.now() + (this.config.validityDays ?? 365) * 86_400_000).toISOString(),
+      validUntil: validityFromDocument(document, this.config.validityDays ?? 365),
       source: { platform: 'sap_business_one', externalId: `delivery-${document.DocEntry}` },
     }, `sap-b1:${systemHash}:delivery:${document.DocEntry}`);
     const record: B1GovpRecord = { key, eventId: notification.EventId, eventTime: notification.EventTime, kind: 'delivery', docEntry: document.DocEntry, status: 'issued', code: result.govp.code, verifyUrl: result.govp.verifyUrl, govp: result.govp };

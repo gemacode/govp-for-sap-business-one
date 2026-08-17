@@ -5,7 +5,7 @@ Emite un GOVP desde una entrega de ventas (`DeliveryNotes`) y comprueba la
 referencia recibida en una entrada de mercancías de compra
 (`PurchaseDeliveryNotes`).
 
-> Estado: candidato técnico `0.1.0`. Las pruebas deterministas no sustituyen la
+> Estado: candidato técnico `0.1.1`. Las pruebas deterministas no sustituyen la
 > aceptación en una instalación SAP Business One real.
 
 ## Alcance
@@ -14,6 +14,7 @@ referencia recibida en una entrada de mercancías de compra
 - modo seguro `observe` y modo explícito `issue`;
 - huella canónica de documento, posiciones, almacén, lotes y series;
 - idempotencia aislada por sistema SAP y `DocEntry`;
+- vigencia determinista calculada desde `DocDate`, estable también en reintentos;
 - enlace opcional mediante UDF configurables, sin modificar el core de SAP;
 - comprobación en recepción y estado de atención para GOVP no válido;
 - eventos creados/actualizados, duplicados y fuera de orden;

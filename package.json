@@ -1,6 +1,6 @@
 {
   "name": "@gemacode/govp-for-sap-business-one",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Open source connector between SAP Business One Service Layer and GOVP Exchange.",
   "type": "module",
   "license": "Apache-2.0",
