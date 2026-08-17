@@ -1,0 +1,18 @@
+name: Bug report
+description: Report a reproducible connector defect without secrets or customer data.
+body:
+  - type: markdown
+    attributes:
+      value: Never include SAP credentials, cookies, customer documents or GOVP tokens.
+  - type: input
+    id: version
+    attributes:
+      label: Connector and SAP Business One versions
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction using synthetic data
+    validations:
+      required: true
